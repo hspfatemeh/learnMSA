@@ -30,25 +30,27 @@ class AminoAcidPrior(tf.keras.layers.Layer):
         self.built = True
         
     def call(self, B, lengths):
-        """Computes log pdf values for each match state.
-        Args:
-        B: A stack of k emission matrices. Assumes that the 20 std amino acids are the first 20 positions of the last dimension
-            and that the states are ordered the standard way as seen in MsaHmmCell. Shape: (k, q, s)
-        Returns:
-            A tensor with the log pdf values of this Dirichlet mixture. The models can vary in length. 
-            Shorter models will have a zero padding in the output. Shape: (k, max_model_length)
-        """
-        k = tf.shape(B)[0]
-        max_model_length = tf.reduce_max(lengths)
-        s = tf.shape(B)[2]
-        #add a small constant to avoid underflow and division by 0 in the next line after
-        B = B[:,1:max_model_length+1,:20] + self.epsilon 
-        B /= tf.reduce_sum(B, axis=-1, keepdims=True) 
-        B = tf.reshape(B, (-1, 20))
-        prior = self.emission_dirichlet_mix.log_pdf(B)
-        prior = tf.reshape(prior, (k, max_model_length))
-        prior *= tf.cast(tf.sequence_mask(lengths), B.dtype)
-        return prior
+         """Computes log pdf values for each match state.
+         Args:
+         B: A stack of k emission matrices. Assumes that the 20 std amino acids are the first 20 positions of the last dimension
+             and that the states are ordered the standard way as seen in MsaHmmCell. Shape: (k, q, s)
+         Returns:
+             A tensor with the log pdf values of this Dirichlet mixture. The models can vary in length. 
+             Shorter models will have a zero padding in the output. Shape: (k, max_model_length)
+         """
+         k = tf.shape(B)[0]
+         max_model_length = tf.reduce_max(lengths)
+         max_model_length = tf.cast(max_model_length, tf.int32)  # Ensure max_model_length is an integer
+         s = tf.shape(B)[2]
+         # Add a small constant to avoid underflow and division by 0
+         B = B[:, 1:max_model_length + 1, :20] + self.epsilon
+         B /= tf.reduce_sum(B, axis=-1, keepdims=True)
+         B = tf.reshape(B, (-1, 20))
+         prior = self.emission_dirichlet_mix.log_pdf(B)
+         prior = tf.reshape(prior, (k, max_model_length))
+         prior *= tf.cast(tf.sequence_mask(lengths), B.dtype)
+         return prior
+
     
     def get_config(self):
         config = super(AminoAcidPrior, self).get_config()
